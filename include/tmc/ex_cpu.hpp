@@ -219,16 +219,19 @@ public:
     tmc::topology::thread_packing_strategy Strategy
   ) TMC_LIFETIMEBOUND;
 
-  /// Builder func to set a hook that will be invoked at the startup of each
-  /// thread owned by this executor, and passed information about this thread.
-  /// This overload requires `TMC_USE_HWLOC`.
+  /// Builder func to set a hook that will be invoked by each thread owned by this
+  /// executor, and passed information about this thread. This hook is called after the
+  /// thread has been initialized, but before it enters the main run loop. It may be
+  /// called by multiple threads concurrently, so you are responsible for any
+  /// synchronization of shared data. This overload requires `TMC_USE_HWLOC`.
   TMC_DECL ex_cpu& set_thread_init_hook(
     std::function<void(tmc::topology::thread_info)> Hook
   ) TMC_LIFETIMEBOUND;
 
   /// Builder func to set a hook that will be invoked before destruction of each
-  /// thread owned by this executor, and passed information about this thread.
-  /// This overload requires `TMC_USE_HWLOC`.
+  /// thread owned by this executor, and passed information about this thread. It may be
+  /// called by multiple threads concurrently, so you are responsible for any
+  /// synchronization of shared data. This overload requires `TMC_USE_HWLOC`.
   TMC_DECL ex_cpu& set_thread_teardown_hook(
     std::function<void(tmc::topology::thread_info)> Hook
   ) TMC_LIFETIMEBOUND;
@@ -277,15 +280,18 @@ public:
   TMC_DECL ex_cpu&
   set_thread_post_run_hook(std::function<bool(size_t)> Hook) TMC_LIFETIMEBOUND;
 
-  /// Builder func to set a hook that will be invoked at the startup of each
-  /// thread owned by this executor, and passed the ordinal index
-  /// [0..thread_count()-1] of the thread.
+  /// Builder func to set a hook that will be invoked by each thread owned by this
+  /// executor, and passed the ordinal index [0..thread_count()-1] of the thread. This
+  /// hook is called after the thread has been initialized, but before it enters the main
+  /// run loop. It may be called by multiple threads concurrently, so you are responsible
+  /// for any synchronization of shared data.
   TMC_DECL ex_cpu&
   set_thread_init_hook(std::function<void(size_t)> Hook) TMC_LIFETIMEBOUND;
 
   /// Builder func to set a hook that will be invoked before destruction of each
   /// thread owned by this executor, and passed the ordinal index
-  /// [0..thread_count()-1] of the thread.
+  /// [0..thread_count()-1] of the thread. It may be called by multiple threads
+  /// concurrently, so you are responsible for any synchronization of shared data.
   TMC_DECL ex_cpu&
   set_thread_teardown_hook(std::function<void(size_t)> Hook) TMC_LIFETIMEBOUND;
 
@@ -357,9 +363,11 @@ public:
     if (!fromExecThread) {
       ++ref_count;
     }
-    if (ThreadHint < thread_count() &&
-        // Check allowed priority of the target thread, not the current thread
-        threads_by_priority_bitset[Priority].test_bit(ThreadHint)) [[unlikely]] {
+    if (
+      ThreadHint < thread_count() &&
+      // Check allowed priority of the target thread, not the current thread
+      threads_by_priority_bitset[Priority].test_bit(ThreadHint)
+    ) [[unlikely]] {
       size_t enqueuedCount = thread_states[ThreadHint].inbox->try_push_bulk(
         static_cast<It&&>(Items), Count, Priority
       );

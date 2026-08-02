@@ -61,9 +61,7 @@ class ex_asio {
     tmc::detail::this_thread::executor() = &type_erased_this;
   }
 
-  inline void clear_thread_locals() {
-    tmc::detail::this_thread::executor() = nullptr;
-  }
+  inline void clear_thread_locals() { tmc::detail::this_thread::executor() = nullptr; }
 
 public:
 #ifdef TMC_USE_BOOST_ASIO
@@ -86,9 +84,10 @@ public:
   }
 #endif
 
-  /// Builder func to set a hook that will be invoked at the startup of the
+  /// Builder func to set a hook that will be invoked by the
   /// executor thread, and passed the ordinal index of the thread (which is
-  /// always 0, since this is a single-threaded executor).
+  /// always 0, since this is a single-threaded executor). This hook is called after the
+  /// thread has been initialized, but before it enters the main run loop.
   inline ex_asio&
   set_thread_init_hook(std::function<void(size_t)> Hook) TMC_LIFETIMEBOUND {
     set_init_params()->set_thread_init_hook(Hook);
@@ -135,10 +134,8 @@ public:
 #endif
 
     // Copy this since it outlives init_params
-    std::function<void(tmc::topology::thread_info)> ThreadTeardownHook =
-      nullptr;
-    if (init_params != nullptr &&
-        init_params->thread_teardown_hook != nullptr) {
+    std::function<void(tmc::topology::thread_info)> ThreadTeardownHook = nullptr;
+    if (init_params != nullptr && init_params->thread_teardown_hook != nullptr) {
       ThreadTeardownHook = init_params->thread_teardown_hook;
     }
 
@@ -147,8 +144,7 @@ public:
     ioc_thread = std::jthread([this, &initThreadsBarrier, ThreadTeardownHook
 #ifdef TMC_USE_HWLOC
                                ,
-                               topo, myCpuSet = partitionCpuset.clone(),
-                               Kind = cpuKind
+                               topo, myCpuSet = partitionCpuset.clone(), Kind = cpuKind
 #endif
     ]() mutable {
 #ifdef TMC_USE_HWLOC
@@ -215,8 +211,7 @@ public:
   }
 
   inline ex_asio()
-      : init_params{nullptr}, ioc(1), type_erased_this(this),
-        initialized(false) {}
+      : init_params{nullptr}, ioc(1), type_erased_this(this), initialized(false) {}
 
   /// Invokes `teardown()`. Must not be called from this executor's thread.
   inline ~ex_asio() { teardown(); }
@@ -235,8 +230,7 @@ public:
   inline tmc::ex_any* type_erased() TMC_LIFETIMEBOUND { return &type_erased_this; }
 
   inline void post(
-    work_item&& Item, size_t Priority = 0,
-    [[maybe_unused]] size_t ThreadHint = NO_HINT
+    work_item&& Item, size_t Priority = 0, [[maybe_unused]] size_t ThreadHint = NO_HINT
   ) {
 #ifdef TMC_USE_BOOST_ASIO
     boost::asio::post(
@@ -246,12 +240,10 @@ public:
       }
     );
 #else
-    asio::post(
-      ioc.get_executor(), [Priority, item = std::move(Item)]() mutable -> void {
-        tmc::detail::this_thread::this_task().prio = Priority;
-        item();
-      }
-    );
+    asio::post(ioc.get_executor(), [Priority, item = std::move(Item)]() mutable -> void {
+      tmc::detail::this_thread::this_task().prio = Priority;
+      item();
+    });
 #endif
   }
 
@@ -265,8 +257,7 @@ public:
       boost::asio::post(
         ioc.get_executor(),
         [Priority,
-         Item =
-           tmc::detail::into_work_item(std::move(*Items))]() mutable -> void {
+         Item = tmc::detail::into_work_item(std::move(*Items))]() mutable -> void {
           tmc::detail::this_thread::this_task().prio = Priority;
           Item();
         }
@@ -275,8 +266,7 @@ public:
       asio::post(
         ioc.get_executor(),
         [Priority,
-         Item =
-           tmc::detail::into_work_item(std::move(*Items))]() mutable -> void {
+         Item = tmc::detail::into_work_item(std::move(*Items))]() mutable -> void {
           tmc::detail::this_thread::this_task().prio = Priority;
           Item();
         }
@@ -313,16 +303,14 @@ private:
 
 namespace detail {
 template <> struct executor_traits<tmc::ex_asio> {
-  static inline void post(
-    tmc::ex_asio& ex, tmc::work_item&& Item, size_t Priority, size_t ThreadHint
-  ) {
+  static inline void
+  post(tmc::ex_asio& ex, tmc::work_item&& Item, size_t Priority, size_t ThreadHint) {
     ex.post(std::move(Item), Priority, ThreadHint);
   }
 
   template <typename It>
   static inline void post_bulk(
-    tmc::ex_asio& ex, It&& Items, size_t Count, size_t Priority,
-    size_t ThreadHint
+    tmc::ex_asio& ex, It&& Items, size_t Count, size_t Priority, size_t ThreadHint
   ) {
     ex.post_bulk(std::forward<It>(Items), Count, Priority, ThreadHint);
   }

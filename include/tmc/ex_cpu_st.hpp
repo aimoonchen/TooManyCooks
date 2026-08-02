@@ -147,9 +147,10 @@ public:
   TMC_DECL ex_cpu_st&
   set_thread_post_run_hook(std::function<bool(size_t)> Hook) TMC_LIFETIMEBOUND;
 
-  /// Builder func to set a hook that will be invoked at the startup of the
-  /// executor thread, and passed the ordinal index of the thread (which is
-  /// always 0, since this is a single-threaded executor).
+  /// Builder func to set a hook that will be invoked by the executor thread, and passed
+  /// the ordinal index of the thread (which is always 0, since this is a single-threaded
+  /// executor). This hook is called after the thread has been initialized, but before it
+  /// enters the main run loop.
   TMC_DECL ex_cpu_st&
   set_thread_init_hook(std::function<void(size_t)> Hook) TMC_LIFETIMEBOUND;
 
